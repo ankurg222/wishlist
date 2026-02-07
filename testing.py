@@ -298,7 +298,7 @@ def extract_wishlist_products(cookies):
     total_products = 0
     
     for page_num in range(TOTAL_PAGES + 1):
-        params = {'currentPage': 0}
+        params = {'currentPage': page_num}
         print(f"Page Number : {page_num}")
         try:
             headers = {
