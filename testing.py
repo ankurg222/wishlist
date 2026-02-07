@@ -8,6 +8,10 @@ import logging
 from pathlib import Path
 import telebot
 import threading
+import os
+
+PROXY_URL = os.getenv('PROXY_URL')
+
 
 WISHLIST_API = "https://www.sheinindia.in/api/wishlist/getwishlist"
 
@@ -311,7 +315,11 @@ def extract_wishlist_products(cookies):
 #                "Connection": "keep-alive",}
             while True:
                 try:
-                    response = requests.get(WISHLIST_API, params=params, cookies=cookies, headers=headers, timeout=REQUEST_TIMEOUT
+                    proxies = None
+                    if PROXY_URL:
+                        proxies = {'http': PROXY_URL, 'https': PROXY_URL}
+                        print("🔒 Proxy active:", PROXY_URL)
+                    response = requests.get(WISHLIST_API, params=params, cookies=cookies,headers=headers,proxies=proxies,timeout=REQUEST_TIMEOUT
                     )
                     print(f"⏱️ Server response time: {response.elapsed.total_seconds():.3f} seconds")
                     break
