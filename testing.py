@@ -307,12 +307,7 @@ def extract_wishlist_products(cookies):
             'Referer': 'https://www.sheinindia.in/',
             'Authorization': f'Bearer {cookies.get("A", "")}',
                  }
-           # headers = {
-#                "User-Agent": ("Mozilla/5.0 (Linux; Android 12; Pixel 6) " "AppleWebKit/537.36 Chrome/121.0 Mobile Safari/537.36"),
-#                "Accept": "application/json",
-#                "Referer": "https://www.sheinindia.in/",
-#                "Origin": "https://www.sheinindia.in",
-#                "Connection": "keep-alive",}
+           
             while True:
                 try:
                     proxies = None
