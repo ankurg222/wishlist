@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import requests
 import json
 import time
@@ -8,23 +6,19 @@ import logging
 from pathlib import Path
 import telebot
 import threading
-import os
 
 PROXY_URL = os.getenv('PROXY_URL')
-
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 WISHLIST_API = "https://www.sheinindia.in/api/wishlist/getwishlist"
 
-TELEGRAM_BOT_TOKEN = "7950026189:AAHiMLsZKJ8zq9j2-n8SpBGa_O6_FLlVlB4"
-
-TELEGRAM_CHAT_ID = "6233150787"
-
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-CHECK_INTERVAL = 3
+CHECK_INTERVAL = 5
 TOTAL_PAGES = 9
 PAGE_SIZE = 10
-REQUEST_TIMEOUT = 5
+REQUEST_TIMEOUT = 3
 MAX_RETRIES = 5
 MAX_NOTIFICATIONS_PER_PRODUCT = 3
 
@@ -39,7 +33,7 @@ class CustomFormatter(logging.Formatter):
     blue = "\x1b[34;20m"
     reset = "\x1b[0m"
     format_str = "%(asctime)s [%(levelname)s] %(message)s"
-    
+
     FORMATS = {
         logging.DEBUG: grey + format_str + reset,
         logging.INFO: green + format_str + reset,
@@ -47,7 +41,7 @@ class CustomFormatter(logging.Formatter):
         logging.ERROR: red + format_str + reset,
         logging.CRITICAL: bold_red + format_str + reset
     }
-    
+
     def format(self, record):
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
@@ -104,7 +98,7 @@ def save_cookies(cookies):
 @bot.message_handler(commands=['start'])
 def start_command(message):
     cookies_exist = os.path.exists('cookies/cookies.json')
-    
+
     if cookies_exist:
         welcome = (
             "🚀 *SHEIN WISHLIST MONITOR BOT*\n"
@@ -149,13 +143,13 @@ def process_cookies(message):
                 parse_mode='Markdown'
             )
             return
-        
+
         file_info = bot.get_file(message.document.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
         cookie_string = downloaded_file.decode('utf-8').strip()
-        
+
         cookies = parse_cookie_header(cookie_string)
-        
+
         if len(cookies) < 5:
             bot.send_message(
                 message.chat.id,
@@ -164,9 +158,9 @@ def process_cookies(message):
                 parse_mode='Markdown'
             )
             return
-        
+
         save_cookies(cookies)
-        
+
         bot.send_message(
             message.chat.id,
             f"✅ *Cookies saved!*\n"
@@ -177,7 +171,7 @@ def process_cookies(message):
             f"━━━━━━━━━━━━━━━━\n",
             parse_mode='Markdown'
         )
-        
+
     except Exception as e:
         bot.send_message(
             message.chat.id,
@@ -188,7 +182,7 @@ def process_cookies(message):
 @bot.message_handler(commands=['startmonitor'])
 def startmonitor_command(message):
     global MONITORING_ACTIVE, MONITOR_THREAD
-    
+
     if not os.path.exists('cookies/cookies.json'):
         bot.send_message(
             message.chat.id,
@@ -197,7 +191,7 @@ def startmonitor_command(message):
             parse_mode='Markdown'
         )
         return
-    
+
     if MONITORING_ACTIVE:
         bot.send_message(
             message.chat.id,
@@ -206,13 +200,13 @@ def startmonitor_command(message):
             parse_mode='Markdown'
         )
         return
-    
+
     bot.send_message(
         message.chat.id,
         "🚀 *Starting monitor...*",
         parse_mode='Markdown'
     )
-    
+
     MONITORING_ACTIVE = True
     MONITOR_THREAD = threading.Thread(target=monitor_wishlist, daemon=True)
     MONITOR_THREAD.start()
@@ -220,7 +214,7 @@ def startmonitor_command(message):
 @bot.message_handler(commands=['stopmonitor'])
 def stopmonitor_command(message):
     global MONITORING_ACTIVE
-    
+
     if not MONITORING_ACTIVE:
         bot.send_message(
             message.chat.id,
@@ -229,9 +223,9 @@ def stopmonitor_command(message):
             parse_mode='Markdown'
         )
         return
-    
+
     MONITORING_ACTIVE = False
-    
+
     bot.send_message(
         message.chat.id,
         "⏹️ *Monitor stopped!*\n\n"
@@ -242,7 +236,7 @@ def stopmonitor_command(message):
 @bot.message_handler(commands=['status'])
 def status_command(message):
     cookies_exist = os.path.exists('cookies/cookies.json')
-    
+
     if MONITORING_ACTIVE:
         status = (
             "✅ *Monitor is RUNNING*\n"
@@ -292,116 +286,133 @@ def send_telegram_message(message):
         logger.error(f"Failed to send Telegram message: {e}")
         return False
 
-
 def extract_wishlist_products(cookies):
-    in_stock_products = []
+    in_stock_products = {}   # key = productCode
     total_products = 0
-    
-    for page_num in range(TOTAL_PAGES + 1):
-        params = {'currentPage': page_num}
-        print(f"Page Number : {page_num}")
-        try:
-            headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-            'Accept': 'application/json',
-            'Referer': 'https://www.sheinindia.in/',
-            'Authorization': f'Bearer {cookies.get("A", "")}',
-                 }
-           
-            while True:
-                try:
-                    proxies = None
-                    if PROXY_URL:
-                        proxies = {'http': PROXY_URL, 'https': PROXY_URL}
-                        print("🔒 Proxy active:", PROXY_URL)
-                    response = requests.get(WISHLIST_API, params=params, cookies=cookies,headers=headers,proxies=proxies,timeout=REQUEST_TIMEOUT
-                    )
-                    print(f"⏱️ Server response time: {response.elapsed.total_seconds():.3f} seconds")
-                    break
-                    
-                except requests.exceptions.Timeout:
-                    print("⏱️ Timeout after 5s, retrying...")
-                    continue
 
-                except requests.exceptions.RequestException as e:
-                    print(f"❌ Request failed: {e}")
-                    time.sleep(1)  # small backoff before retry
-            
-            #session = requests.Session()
-#            session.headers.update(headers)
-#            session.cookies.update(cookies)
-#            response = session.get(WISHLIST_API, params=params, timeout=REQUEST_TIMEOUT)
-            
-            logger.warning(f"Status: {response.status_code}")
-            #logger.warning(f"Headers: {dict(response.headers)}")
-            #try:
-#                logger.warning(f"Body: {response.text[:500]}...")
-#            except:
-#                logger.warning("Body: binary/error")
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://www.sheinindia.in/',
+        'Authorization': f'Bearer {cookies.get("A", "")}'
+    }
 
-            if response.status_code != 200:
-                logger.error(f"Non-200 for page {page_num}: {response.status_code}")
-            
-            data = response.json()
-            
-            if 'products' not in data:
-                continue
-            
-            products = data.get('products', [])
-            
-            if not products:
+    session = requests.Session()
+    session.headers.update(headers)
+    session.cookies.update(cookies)
+
+    for page_num in range(TOTAL_PAGES+1):
+        params = {
+        'currentPage': page_num,
+        'pageSize': PAGE_SIZE
+        }
+        print(f"Page Number: {page_num+1}")
+
+        attempt = 0
+        response = None
+
+        while attempt < MAX_RETRIES:
+            try:
+                proxies = {'http': PROXY_URL, 'https': PROXY_URL} if PROXY_URL else None
+
+                response = session.get(
+                    WISHLIST_API,
+                    params=params,
+                    #cookies=cookies,
+                    #headers=headers,
+                    proxies=proxies,
+timeout=REQUEST_TIMEOUT
+                )
+
+                print(f"Response Time in {attempt+1} attempt : {response.elapsed.total_seconds():.3f}s")
                 break
-            
-            for product in products:
-                total_products += 1
-                product_code = product.get('productCode', '')
-                product_name = product.get('name', 'Unknown')
-                
-                if 'variantOptions' in product:
-                    for variant in product['variantOptions']:
-                        stock = variant.get('stock', {})
-                        if stock.get('stockLevelStatus') == 'inStock':
-                            variant_code = variant.get('code')
-                            size = next((q['value'] for q in variant.get('variantOptionQualifiers', []) 
-                                       if q['qualifier'] == 'size'), 'Unknown')
-                            
-                            in_stock_products.append({
-                                'productCode': product_code,
-                                'name': product_name,
-                                'size': size,
-                                'price': product.get('price', {}).get('value', 0),
-                                'url': product.get('url', '')
-                            })
-            
-            time.sleep(0.1)
-            
-        except requests.exceptions.Timeout:
+
+            except requests.exceptions.Timeout:
+                attempt += 1
+                #wait = 1.5 + attempt * 0.5
+                print(f"Timeout ({attempt}/{MAX_RETRIES})")
+                #time.sleep(wait)
+
+            except requests.exceptions.RequestException as e:
+                logger.error(f"❌ Request failed: {e}")
+                break
+
+        else:
+            print("❌ Max retries reached, skipping page")
             continue
-        except requests.exceptions.RequestException:
+
+        if response is None:
             continue
+
+        if response.status_code != 200:
+            logger.error(f"🚫 HTTP {response.status_code} on page {page_num}")
+            continue
+
+        try:
+            data = response.json()
         except json.JSONDecodeError:
+            logger.error(f"⚠️ Invalid JSON on page {page_num}")
             continue
-        except Exception:
-            continue
-    
-    return in_stock_products, total_products
+
+        products = data.get('products', [])
+        if not products:
+            break
+
+        for product in products:
+            total_products += 1
+
+            product_code = product.get('productCode', '')
+            if not product_code:
+                continue
+
+            product_name = product.get('name', 'Unknown')
+            price = product.get('price', {}).get('value', 0)
+            url = product.get('url', '')
+
+            in_stock_sizes = []
+
+            for variant in product.get('variantOptions', []):
+                stock = variant.get('stock', {})
+                if stock.get('stockLevelStatus') == 'inStock':
+                    size = next(
+                        (q['value'] for q in variant.get('variantOptionQualifiers', [])
+                         if q['qualifier'] == 'size'),
+                        None
+                    )
+                    if size:
+                        in_stock_sizes.append(size)
+
+            # Add product ONLY ONCE, with all in-stock sizes
+            if in_stock_sizes:
+                in_stock_products[product_code] = {
+                    'productCode': product_code,
+                    'name': product_name,
+                    'sizes': sorted(set(in_stock_sizes)),
+                    'price': price,
+                    'url': url
+                }
+
+        time.sleep(0.6)
+
+    return list(in_stock_products.values()), total_products
 
 def monitor_wishlist():
     global PREVIOUS_STOCK_STATUS, NOTIFICATION_COUNTS
-    
+    global MONITORING_ACTIVE
+
     cookies = load_cookies()
     if not cookies:
         logger.error("No cookies found. Cannot monitor.")
         return
-    
+
     logger.info("Starting SHEIN Wishlist Monitor...")
     logger.info(f"Check interval: {CHECK_INTERVAL}s")
-    logger.info(f"Monitoring {TOTAL_PAGES + 1} pages...") 
+    logger.info(f"Monitoring {TOTAL_PAGES+1} pages...") 
     logger.info("🔄 Performing initial scan...")
     initial_products, total_count = extract_wishlist_products(cookies)
     PREVIOUS_STOCK_STATUS = {p['productCode']: True for p in initial_products}
     logger.info(f"Total: {total_count} | In-stock: {len(initial_products)} | Out-of-stock: {total_count - len(initial_products)}")
-    
+
     send_telegram_message(
         f"🚀 *SHEIN WISHLIST MONITOR*\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -415,35 +426,35 @@ def monitor_wishlist():
         f"💬 You'll get alerts when stock changes!\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
     )
-    
+
     scan_count = 0
-    
+
     try:
-        while True:
+        while MONITORING_ACTIVE:
             scan_count += 1
             start_time = time.time()
-            
+
             products, total = extract_wishlist_products(cookies)
-            
+
             notified = 0
-            
+
             for product in products:
                 code = product['productCode']
-                
+
                 was_in_stock = PREVIOUS_STOCK_STATUS.get(code, False)
                 PREVIOUS_STOCK_STATUS[code] = True
-                
+
                 if was_in_stock:
                     continue
-                
+
                 notify_count = NOTIFICATION_COUNTS.get(code, 0)
                 if notify_count >= MAX_NOTIFICATIONS_PER_PRODUCT:
                     continue
-                
+
                 notify_count += 1
                 NOTIFICATION_COUNTS[code] = notify_count
                 save_notification_counts(NOTIFICATION_COUNTS)
-                
+
                 raw_url = product.get('url', '')
                 if raw_url.startswith('http'):
                     import re
@@ -454,12 +465,13 @@ def monitor_wishlist():
                     product_url = f"https://www.sheinindia.in{clean_url}"
                 else:
                     product_url = f"https://www.sheinindia.in/product-{code}.html"
-                
+
+                sizes = ", ".join(product.get('sizes', [])) or "N/A"
                 message = (
                     f"🔔 *IN-STOCK ALERT!*\n"
                     f"━━━━━━━━━━━━━━━━\n"
                     f"📦 Product: {product['name']}\n"
-                    f"📏 Size: {product['size']}\n"
+                    f"📏 Sizes in stock: {sizes}\n"
                     f"💰 Price: Rs.{product['price']}\n"
                     f"🔖 Code: `{code}`\n"
                     f"━━━━━━━━━━━━━━━━\n"
@@ -467,23 +479,26 @@ def monitor_wishlist():
                     f"🔔 Alert {notify_count}/{MAX_NOTIFICATIONS_PER_PRODUCT}\n\n"
                     f"━━━━━━━━━━━━━━━━\n"
                 )
-                
+
                 if send_telegram_message(message):
                     logger.info(f"📨 Alert sent: {product['name']} ({code})")
                     notified += 1
                 else:
                     logger.error(f"❌ Failed to send alert for {code}")
-            
+
             current_codes = {p['productCode'] for p in products}
             for code in list(PREVIOUS_STOCK_STATUS.keys()):
                 if code not in current_codes:
                     PREVIOUS_STOCK_STATUS[code] = False
-            
+
+            PREVIOUS_STOCK_STATUS = {
+            code: status for code, status in PREVIOUS_STOCK_STATUS.items() if code in current_codes
+            }
             duration = time.time() - start_time
             logger.info(f"Scan #{scan_count}: {duration:.1f}s | Total: {total} | In-stock: {len(products)} | Notified: {notified}")
-            
+
             time.sleep(CHECK_INTERVAL)
-            
+
     except KeyboardInterrupt:
         logger.info("\n⏹️  Monitor stopped by user")
         send_telegram_message(
@@ -496,7 +511,6 @@ def monitor_wishlist():
         send_telegram_message(
             f"❌ *Monitor Error*\n{str(e)}\n\n"
             "━━━━━━━━━━━━━━━━\n"
-            "📢 @premiumlootersonly"
         )
 
 if __name__ == "__main__":
@@ -509,4 +523,3 @@ if __name__ == "__main__":
         bot.infinity_polling()
     except KeyboardInterrupt:
         logger.info("\n⏹️  Bot stopped by user")
-
