@@ -150,7 +150,7 @@ def process_cookies(m):
         return
 
     save_cookies(cookies)
-    bot.reply_to(m, "✅ Cookies saved successfully. Use /startmonitor to start")
+    bot.reply_to(m, "✅ Cookies saved successfully.\nUse /startmonitor to start")
 
 @bot.message_handler(commands=["status"])
 def status_cmd(m):
