@@ -7,7 +7,7 @@ from pathlib import Path
 import telebot
 import threading
 
-PROXY_URL = os.getenv('PROXY_URL')
+#PROXY_URL = os.getenv('PROXY_URL')
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -313,14 +313,14 @@ def extract_wishlist_products(cookies):
 
         while attempt < MAX_RETRIES:
             try:
-                proxies = {'http': PROXY_URL, 'https': PROXY_URL} if PROXY_URL else None
+                #proxies = {'http': PROXY_URL, 'https': PROXY_URL} if PROXY_URL else None
 
                 response = session.get(
                     WISHLIST_API,
                     params=params,
                     #cookies=cookies,
                     #headers=headers,
-                    proxies=proxies,
+                    #proxies=proxies,
 timeout=REQUEST_TIMEOUT
                 )
 
