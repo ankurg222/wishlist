@@ -11,10 +11,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # ================= CONFIG =================
 
 #PROXY_URL = os.getenv('PROXY_URL')
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+#TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+#TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 #PROXY_URL = "http://27.34.242.98:80"
+
+TELEGRAM_BOT_TOKEN = "7950026189:AAHiMLsZKJ8zq9j2-n8SpBGa_O6_FLlVlB4"
+TELEGRAM_CHAT_ID = "6233150787"
 
 WISHLIST_API = "https://www.sheinindia.in/api/wishlist/getwishlist"
 
@@ -215,6 +218,9 @@ def fetch_wishlist_page(session, page_num):
 
     return []
 
+SCAN_STATS = {"fetched": 0}
+scan_lock = threading.Lock()
+
 # ================= PARALLEL SCAN =================
 
 def scan_pages_parallel(cookies):
@@ -228,10 +234,6 @@ def scan_pages_parallel(cookies):
     session = requests.Session()
     session.headers.update(headers)
     session.cookies.update(cookies)
-
-    in_stock_products = []
-    total_products = 0
-    all_seen_codes = set()
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [
@@ -247,8 +249,9 @@ def scan_pages_parallel(cookies):
                 if not code:
                     continue
 
-                all_seen_codes.add(code)
-                total_products += 1
+                # ✅ count EVERY fetched product
+                with scan_lock:
+                    SCAN_STATS["fetched"] += 1
 
                 in_stock = False
                 in_stock_sizes = []
@@ -256,7 +259,6 @@ def scan_pages_parallel(cookies):
                 for variant in product.get("variantOptions", []):
                     if variant.get("stock", {}).get("stockLevelStatus") == "inStock":
                         in_stock = True
-                        #send_telegram_message(f"🔖 `{code}`\n")
                         size = next(
                             (
                                 q.get("value")
@@ -268,16 +270,14 @@ def scan_pages_parallel(cookies):
                         if size:
                             in_stock_sizes.append(size)
 
-                if in_stock:
-                    in_stock_products.append({
-                        "productCode": code,
-                        "name": product.get("name", "Unknown"),
-                        "price": product.get("price", {}).get("value", 0),
-                        "url": product.get("url", ""),
-                        "sizes": sorted(set(in_stock_sizes))
-                    })
-
-    return in_stock_products, total_products, all_seen_codes
+                yield {
+                    "productCode": code,
+                    "in_stock": in_stock,
+                    "name": product.get("name", "Unknown"),
+                    "price": product.get("price", {}).get("value", 0),
+                    "url": product.get("url", ""),
+                    "sizes": sorted(set(in_stock_sizes)) if in_stock else []
+                }
 
 # ================= MONITOR =================
 
@@ -294,21 +294,29 @@ def monitor_wishlist():
     while MONITORING_ACTIVE:
         start_time = time.time()
 
-        products, total, all_seen_codes = scan_pages_parallel(cookies)
-        current_in_stock_codes = set()
-        notified = 0
+        # reset scan counters
+        with scan_lock:
+            SCAN_STATS["fetched"] = 0
 
-        # ===== RESTOCK DETECTION =====
-        for product in products:
+        notified = 0
+        in_stock_found = 0
+        seen_in_stock_this_scan = set()
+
+        # ===== INSTANT RESTOCK DETECTION =====
+        for product in scan_pages_parallel(cookies):
+            if not product["in_stock"]:
+                continue
+
             code = product["productCode"]
-            current_in_stock_codes.add(code)
+            in_stock_found += 1
+            seen_in_stock_this_scan.add(code)
 
             with status_lock:
                 was_in_stock = PREVIOUS_STOCK_STATUS.get(code, False)
 
                 if was_in_stock:
                     PREVIOUS_STOCK_STATUS[code] = True
-                    continue   # still in stock → no alert
+                    continue
 
                 notify_count = NOTIFICATION_COUNTS.get(code, 0)
                 if notify_count >= MAX_NOTIFICATIONS_PER_PRODUCT:
@@ -316,41 +324,42 @@ def monitor_wishlist():
 
                 NOTIFICATION_COUNTS[code] = notify_count + 1
                 save_notification_counts(NOTIFICATION_COUNTS)
-
                 PREVIOUS_STOCK_STATUS[code] = True
 
             url = product["url"]
             if not url.startswith("http"):
                 url = f"https://www.sheinindia.in{url}"
 
-            sizes = product.get("sizes", [])
-            sizes_text = ", ".join(sizes) if sizes else "Unknown"
+            sizes_text = ", ".join(product["sizes"]) or "Unknown"
 
             send_telegram_message(
                 f"🔔 *IN STOCK!*\n"
                 f"📦 {product['name']}\n"
                 f"📏 {sizes_text}\n"
                 f"💰 Rs.{product['price']}\n"
-                #f"🔖 `{code}`\n"
                 f"🛒 [OPEN PRODUCT]({url})"
             )
-            time.sleep(1)
 
+            time.sleep(1)
             logger.info(f"📨 Alert sent: {code}")
             notified += 1
 
-        # ===== OUT-OF-STOCK RESET =====
+        # ===== OUT-OF-STOCK RESET (SAFE) =====
         with status_lock:
-            for code in list(PREVIOUS_STOCK_STATUS.keys()):
-        # Reset ONLY if product was fetched AND has no stock
-                if code in all_seen_codes and code not in current_in_stock_codes:
+            for code, was_in_stock in PREVIOUS_STOCK_STATUS.items():
+                if was_in_stock and code not in seen_in_stock_this_scan:
                     PREVIOUS_STOCK_STATUS[code] = False
                     NOTIFICATION_COUNTS[code] = 0
 
         duration = time.time() - start_time
+        with scan_lock:
+            fetched_total = SCAN_STATS["fetched"]
+
         logger.info(
             f"Scan done | {duration:.1f}s | "
-            f"Total: {total} | In-stock: {len(products)} | Alerts: {notified}"
+            f"Fetched: {fetched_total} | "
+            f"In-stock: {in_stock_found} | "
+            f"Alerts: {notified}"
         )
 
         time.sleep(CHECK_INTERVAL)
