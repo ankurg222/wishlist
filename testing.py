@@ -256,6 +256,7 @@ def scan_pages_parallel(cookies):
                 for variant in product.get("variantOptions", []):
                     if variant.get("stock", {}).get("stockLevelStatus") == "inStock":
                         in_stock = True
+                        send_telegram_message(f"🔖 `{code}`\n")
                         size = next(
                             (
                                 q.get("value")
