@@ -10,14 +10,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ================= CONFIG =================
 
-#PROXY_URL = os.getenv('PROXY_URL')
-#TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-#TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-#PROXY_URL = "http://27.34.242.98:80"
-
-TELEGRAM_BOT_TOKEN = "7950026189:AAHiMLsZKJ8zq9j2-n8SpBGa_O6_FLlVlB4"
-TELEGRAM_CHAT_ID = "6233150787"
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 WISHLIST_API = "https://www.sheinindia.in/api/wishlist/getwishlist"
 
