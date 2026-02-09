@@ -15,7 +15,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 WISHLIST_API = "https://www.sheinindia.in/api/wishlist/getwishlist"
 
-CHECK_INTERVAL = 4
+CHECK_INTERVAL = 4.5
 TOTAL_PAGES = 9
 PAGE_SIZE = 10
 REQUEST_TIMEOUT = 4
