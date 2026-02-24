@@ -327,7 +327,6 @@ def monitor_wishlist():
             sizes_text = ", ".join(product["sizes"]) or "Unknown"
 
             send_telegram_message(
-                f"🔔 *IN STOCK!*\n"
                 f"📦 {product['name']}\n"
                 f"📏 {sizes_text}\n"
                 f"💰 Rs.{product['price']}\n"
