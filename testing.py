@@ -219,9 +219,11 @@ scan_lock = threading.Lock()
 
 def scan_pages_parallel(cookies):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 12; GM1911 Build/SKQ1.211113.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.159 Mobile Safari/537.36",
+        "content-type" : "application/json"
+        "x-tenant-id" : "SHEIN"
         "Accept": "application/json",
-        "Referer": "https://www.sheinindia.in/",
+        "Referer": "https://www.sheinindia.in/wishlist",
         "Authorization": f"Bearer {cookies.get('A', '')}"
     }
 
